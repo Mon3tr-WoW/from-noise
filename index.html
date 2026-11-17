@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FROM NOISE · 本地部署的生图模型 Stable Diffusion</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/chapters.css">
+</head>
+<body>
+
+<!-- ========== 全局层 ========== -->
+<canvas id="noiseLayer"></canvas>
+<div id="world"><div id="worldInner"></div></div>
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<div id="cursor"><i class="c-dot"></i><i class="c-ring"></i><span class="c-label"></span></div>
+
+<!-- 顶部 HUD -->
+<header id="hud" class="hud">
+  <div class="hud-brand">
+    <svg viewBox="0 0 40 40" class="brand-mark"><path d="M20 2 38 20 20 38 2 20Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 10 30 20 20 30 10 20Z" fill="currentColor"/></svg>
+    <div>
+      <b>FROM NOISE</b>
+      <small>STABLE DIFFUSION · FIELD REPORT</small>
+    </div>
+  </div>
+  <nav class="hud-chapters" id="hudChapters"></nav>
+  <div class="hud-tools">
+    <button class="tool" id="btnTimer" title="计时（点击重置）"><span id="timer">00:00</span></button>
+    <button class="tool" id="btnSound" title="音效 S"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="snd-on" d="M16 8c1.5 1.2 1.5 6.8 0 8M18.5 5.5c3 2.8 3 10.2 0 13" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    <button class="tool" id="btnMenu" title="章节地图 M"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h12" stroke="currentColor" stroke-width="2"/></svg></button>
+    <button class="tool" id="btnFull" title="全屏 F"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+  </div>
+</header>
+
+<!-- 底部 HUD -->
+<footer id="foot" class="hud">
+  <div class="foot-cap">
+    <span class="foot-code" id="footCode">00-0</span>
+    <span class="foot-title" id="footTitle">BOOT</span>
+  </div>
+  <div class="foot-prog" id="footProg"></div>
+  <div class="foot-nav">
+    <button id="btnPrev" class="nav-prev" aria-label="上一页"><svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
+    <button id="btnNext" class="nav-next"><span class="nn-small">NEXT</span><span class="nn-label" id="nextLabel">开始</span><svg viewBox="0 0 24 24"><path d="M9 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2.6"/></svg></button>
+  </div>
+</footer>
+
+<!-- 转场 -->
+<div id="wipe">
+  <i class="w1"></i><i class="w2"></i><i class="w3"></i>
+  <div class="wipe-txt"><b id="wipeNo">02</b><span id="wipeTitle">PRINCIPLE</span><small id="wipeSub">从噪声到画面</small></div>
+</div>
+
+<!-- 章节地图 -->
+<div id="menu">
+  <div class="menu-head"><b>MISSION MAP</b><span>章节地图 · 点击跳转 · Esc 关闭</span></div>
+  <div class="menu-grid" id="menuGrid"></div>
+</div>
+
+<!-- 通用图片查看器 -->
+<div id="viewer">
+  <div class="v-img"><img id="viewerImg" alt=""><i class="v-scan"></i></div>
+  <aside class="v-meta" id="viewerMeta"></aside>
+  <button class="v-close" id="viewerClose">CLOSE ✕</button>
+</div>
+
+<div id="toasts"></div>
+
+<!-- ========== 场景 ========== -->
+<main id="scenes">
+
+<!-- 00 BOOT -->
+<section class="scene" id="s-boot" data-ch="0" data-title="BOOT" data-next="长按开始">
+  <div class="boot-log" id="bootLog"></div>
+  <div class="boot-center">
+    <div class="boot-kicker">LATENT DIFFUSION TERMINAL · v1.5</div>
+    <div class="hold" id="hold">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="92" class="h-track"/>
+        <circle cx="100" cy="100" r="92" class="h-prog" id="holdProg"/>
+        <g class="h-ticks" id="holdTicks"></g>
+      </svg>
+      <div class="h-in"><b>HOLD</b><span>长按 · 唤醒</span></div>
+    </div>
+    <p class="boot-tip">按住鼠标或空格键 —— 让画面<em>从噪声中</em>浮现</p>
+  </div>
+  <div class="boot-step" id="bootStep">STEP 0 / 20 · σ = 14.61</div>
+</section>
+
+<!-- 01 TITLE -->
+<section class="scene" id="s-title" data-ch="1" data-title="TITLE · 标题" data-next="自由探索">
+  <div class="title-wrap">
+    <div class="t-kicker rv"><i></i>HarmonyOS 软硬件协同创新实践 · 期中分享</div>
+    <h1 class="t-main">
+      <span class="t-line rv" style="--d:.1s">STABLE</span>
+      <span class="t-line rv outline" style="--d:.2s">DIFFUSION</span>
+    </h1>
+    <div class="t-cn rv" style="--d:.35s">本地部署的生图模型 <b>·</b> 从一片噪声，到一个角色</div>
+    <div class="t-meta rv" style="--d:.5s">
+      <span><small>PRESENTER</small><b class="presenter">朱俊安</b></span>
+      <span><small>DATE</small><b>2026.10</b></span>
+      <span><small>RUNTIME</small><b>≈ 05:00</b></span>
+    </div>
+  </div>
+  <div class="t-side rv" style="--d:.6s">
+    <div class="barcode"></div>
+    <span>SD-1.5 / SDXL / ILLUSTRIOUS</span>
+  </div>
+  <div class="t-chapters rv" style="--d:.7s">
+    <div><b>01</b>开场</div><div><b>02</b>原理</div><div><b>03</b>LoRA</div><div><b>04</b>作品</div><div><b>05</b>思考</div>
+  </div>
+</section>
+
+<!-- 02 GALLERY -->
+<section class="scene" id="s-gallery" data-ch="1" data-title="INFINITE GALLERY · 无限画廊" data-next="它们从哪里来？">
+  <div class="gal-hint rv"><b>拖拽</b> 漫游 · <b>点击</b> 调阅档案 · <b>滚轮</b> 加速</div>
+  <div class="gal-counter rv" style="--d:.15s"><small>ARCHIVE VIEWED</small><b id="galCount">00</b><span>/ 44</span></div>
+  <div class="gal-reveal" id="galReveal">
+    <p>这里的每一张画</p>
+    <h2>都不是人画的</h2>
+    <small>全部来自 Stable Diffusion 社区 · Civitai 最高赞作品</small>
+  </div>
+</section>
+
+<!-- 03 CH2 COVER -->
+<section class="scene cover" id="s-c2" data-ch="2" data-title="CH.02 · 原理" data-next="第一步">
+  <div class="cv-no">02</div>
+  <div class="cv-body">
+    <div class="cv-code rv">OPERATION · PRINCIPLE</div>
+    <h2 class="rv" style="--d:.1s">从噪声到画面</h2>
+    <p class="cv-en rv" style="--d:.2s">HOW STABLE DIFFUSION DREAMS</p>
+    <div class="vn rv" style="--d:.4s"><i class="vn-ava"></i><div><b>遥</b><p data-type>电脑不会拿画笔。那它到底是怎么“画”出一张画的？跟我来，一步一步拆开看。</p></div></div>
+  </div>
+  <div class="cv-ring"></div>
+  <div class="cv-steps rv" style="--d:.5s"><span>01 破坏</span><span>02 修复</span><span>03 压缩</span><span>04 听懂</span><span>05 引导</span><span>06 全流程</span></div>
+</section>
+
+<!-- 04 FORWARD -->
+<section class="scene lab" id="s-forward" data-ch="2" data-title="FORWARD DIFFUSION · 加噪" data-next="反过来">
+  <div class="lab-text">
+    <div class="step-tag rv">STEP 01 / 06</div>
+    <h3 class="rv" style="--d:.05s">先学会“破坏”</h3>
+    <p class="rv" style="--d:.1s">训练时，把成千上万张图<b>一点点加上随机噪声</b>，直到它变成一片纯粹的雪花。</p>
+    <div class="card rv" style="--d:.2s">
+      <small>模型唯一要学的事</small>
+      <p>看一张带噪声的图，<em>猜出被加进去的噪声是什么</em>。</p>
+    </div>
+    <div class="card dim rv" style="--d:.3s">
+      <small>为什么要这样？</small>
+      <p>“加噪”可以无限制造练习题：任何一张图 × 任何噪声强度，都是一道有标准答案的题。</p>
+    </div>
+    <div class="formula rv" style="--d:.4s">x<sub>t</sub> = √ᾱ<sub>t</sub> · x<sub>0</sub> + √(1−ᾱ<sub>t</sub>) · ε</div>
+  </div>
+  <div class="lab-stage">
+    <div class="frame"><canvas id="fwdCanvas"></canvas><i class="fr-c"></i><span class="fr-label">x<sub>t</sub></span></div>
+    <div class="ctrl">
+      <div class="ctrl-row"><label>时间步 t</label><input type="range" id="fwdT" min="0" max="1000" value="0"><b id="fwdTv">0</b></div>
+      <div class="meters">
+        <div><small>原图信号 √ᾱ</small><i><em id="fwdSig"></em></i><b id="fwdSigV">1.00</b></div>
+        <div><small>噪声 √(1−ᾱ)</small><i><em id="fwdNoi" class="noi"></em></i><b id="fwdNoiV">0.00</b></div>
+      </div>
+      <button class="btn" id="fwdPlay">▶ 自动加噪</button>
+    </div>
+  </div>
+  <div class="vn vn-float rv" style="--d:.5s"><i class="vn-ava"></i><div><b>遥</b><p data-type>拖一拖滑块——我会慢慢消失在雪花里。别担心，下一页会把我找回来。</p></div></div>
+</section>
+
+<!-- 05 REVERSE -->
+<section class="scene lab" id="s-reverse" data-ch="2" data-title="REVERSE DIFFUSION · 去噪" data-next="在哪里画？">
+  <div class="lab-text">
+    <div class="step-tag rv">STEP 02 / 06</div>
+    <h3 class="rv" style="--d:.05s">再反过来“修复”</h3>
+    <p class="rv" style="--d:.1s">生成时从<b>纯噪声</b>出发，每一步：<br>预测噪声 → 减掉一部分 → 得到更干净一点的图。</p>
+    <div class="card rv" style="--d:.2s">
+      <small>为什么不一步到位？</small>
+      <p>一次猜出整张图太难，结果只会是一团模糊。每次只走一小步，上一步的误差能在下一步被修正——像雕塑，先打粗坯，再精修。</p>
+    </div>
+    <div class="phase rv" style="--d:.3s" id="revPhase">
+      <span data-p="0">构图 · 大色块</span><span data-p="1">形体 · 配色</span><span data-p="2">细节 · 纹理</span>
+    </div>
+  </div>
+  <div class="lab-stage rev">
+    <div class="rev-row">
+      <div class="frame sm"><canvas id="revX"></canvas><span class="fr-label">当前 x<sub>t</sub></span></div>
+      <div class="op">−</div>
+      <div class="frame sm"><canvas id="revE"></canvas><span class="fr-label">预测噪声 ε̂</span></div>
+      <div class="op">→</div>
+      <div class="frame sm"><canvas id="revX0"></canvas><span class="fr-label">模型眼中的原图 x̂<sub>0</sub></span></div>
+    </div>
+    <div class="rev-steps" id="revSteps"></div>
+    <div class="ctrl inline">
+      <button class="btn y" id="revStep">去噪一步 ▶</button>
+      <button class="btn" id="revAuto">▶▶ 自动</button>
+      <button class="btn ghost" id="revReset">↺ 换个噪声</button>
+      <span class="readout" id="revRead">STEP 0 / 20</span>
+    </div>
+  </div>
+</section>
+
+<!-- 06 LATENT -->
+<section class="scene lab" id="s-latent" data-ch="2" data-title="LATENT SPACE · 潜空间" data-next="怎么听懂文字？">
+  <div class="lab-text">
+    <div class="step-tag rv">STEP 03 / 06</div>
+    <h3 class="rv" style="--d:.05s">在“压缩空间”里画</h3>
+    <p class="rv" style="--d:.1s">直接在像素上反复去噪，计算量大得吓人。SD 的关键一招：先用 <b>VAE 编码器</b>把图压缩成一个小小的“潜在表示”。</p>
+    <div class="numbers rv" style="--d:.2s">
+      <div><small>像素空间 512×768×3</small><b id="latA">1,179,648</b></div>
+      <div class="arrow">÷ 48</div>
+      <div><small>潜空间 64×96×4</small><b id="latB" class="y">24,576</b></div>
+    </div>
+    <div class="card rv" style="--d:.3s">
+      <small>意义</small>
+      <p>所有加噪、去噪都在潜空间完成，最后用 VAE 解码器一次还原成像素。<em>一张 6~8GB 显存的游戏显卡就能跑</em>——这正是“本地部署”成为可能的原因。</p>
+    </div>
+  </div>
+  <div class="lab-stage lat">
+    <div class="lat-flow">
+      <div class="frame"><canvas id="latPix"></canvas><span class="fr-label">像素 · 512×768</span></div>
+      <div class="lat-funnel" id="latFunnel"><svg viewBox="0 0 120 200"><path d="M0 0 120 70v60L0 200Z"/></svg><span>VAE<br>ENCODER</span></div>
+      <div class="lat-ch" id="latCh">
+        <div class="frame xs"><canvas data-c="0"></canvas><span class="fr-label">ch1</span></div>
+        <div class="frame xs"><canvas data-c="1"></canvas><span class="fr-label">ch2</span></div>
+        <div class="frame xs"><canvas data-c="2"></canvas><span class="fr-label">ch3</span></div>
+        <div class="frame xs"><canvas data-c="3"></canvas><span class="fr-label">ch4</span></div>
+      </div>
+    </div>
+    <div class="ctrl inline">
+      <button class="btn y" id="latEnc">▶ 编码（压缩）</button>
+      <button class="btn" id="latDec">◀ 解码（还原）</button>
+      <span class="readout" id="latRead">PIXEL SPACE</span>
+    </div>
+  </div>
+</section>
+
+<!-- 07 TEXT -->
+<section class="scene lab" id="s-text" data-ch="2" data-title="TEXT CONDITIONING · 听懂文字" data-next="听话程度">
+  <div class="lab-text">
+    <div class="step-tag rv">STEP 04 / 06</div>
+    <h3 class="rv" style="--d:.05s">让它“听懂”你的话</h3>
+    <p class="rv" style="--d:.1s">提示词先被切成 token，再由 <b>CLIP 文本编码器</b>翻译成一组向量——这是模型能理解的“语言”。</p>
+    <div class="card rv" style="--d:.2s">
+      <small>交叉注意力 Cross-Attention</small>
+      <p>每一步去噪时，画面上的每个位置都会去“询问”这些向量：<em>我这里该画什么？</em></p>
+    </div>
+    <p class="hint rv" style="--d:.3s">👉 点击上方的词，看看它“负责”画面的哪一部分</p>
+  </div>
+  <div class="lab-stage txt">
+    <div class="prompt-bar" id="promptBar"><span class="pb-label">PROMPT</span></div>
+    <div class="txt-row">
+      <div class="clip-col">
+        <div class="clip-box"><small>CLIP TEXT ENCODER</small><b>77 × 768</b></div>
+        <div class="vecs" id="vecs"></div>
+      </div>
+      <div class="frame att"><img id="attImg" alt=""><canvas id="attHeat"></canvas><span class="fr-label" id="attLabel">attention · —</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 08 CFG -->
+<section class="scene lab" id="s-cfg" data-ch="2" data-title="CFG · 引导强度" data-next="串起来">
+  <div class="lab-text">
+    <div class="step-tag rv">STEP 05 / 06</div>
+    <h3 class="rv" style="--d:.05s">“听话”可以调节</h3>
+    <p class="rv" style="--d:.1s">每一步，模型其实预测<b>两次</b>：一次看着提示词，一次什么都不看。两者之差，就是“提示词想把画面推向的方向”。</p>
+    <div class="formula rv" style="--d:.2s">ε = ε<sub>∅</sub> + <b class="y" id="cfgS1">7</b> · (ε<sub>prompt</sub> − ε<sub>∅</sub>)</div>
+    <div class="card rv" style="--d:.3s">
+      <small>负面提示词 Negative Prompt</small>
+      <p>把“什么都不看”换成“看着你不想要的东西”——画面就会被<em>主动推离</em>这些特征。</p>
+    </div>
+  </div>
+  <div class="lab-stage cfg">
+    <div class="cfg-row">
+      <svg class="vecplot" id="cfgPlot" viewBox="0 0 320 320"></svg>
+      <div class="frame"><img id="cfgImg" alt=""><span class="fr-label" id="cfgState">CFG 7 · 平衡</span></div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-row"><label>CFG Scale</label><input type="range" id="cfgS" min="1" max="20" step="0.5" value="7"><b id="cfgSv">7.0</b></div>
+      <div class="chips" id="negChips">
+        <span class="lbl">NEGATIVE</span>
+        <button class="chip">lowres</button><button class="chip">blurry</button><button class="chip">bad hands</button><button class="chip">extra fingers</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 09 PIPELINE -->
+<section class="scene lab wide" id="s-pipe" data-ch="2" data-title="FULL PIPELINE · 全流程" data-next="进入 LoRA">
+  <div class="pipe-head">
+    <div class="step-tag rv">STEP 06 / 06</div>
+    <h3 class="rv" style="--d:.05s">按下 <span class="y">Generate</span> 之后发生了什么</h3>
+  </div>
+  <div class="pipe rv" style="--d:.15s" id="pipe">
+    <div class="pn" data-n="prompt"><small>01 · INPUT</small><b>提示词</b><code>1girl, pink hair, red bow, cherry blossoms…</code></div>
+    <div class="pl" data-l="1"></div>
+    <div class="pn" data-n="clip"><small>02 · CLIP</small><b>文本编码器</b><span>文字 → 向量</span></div>
+    <div class="pl down" data-l="2"></div>
+    <div class="pn seed" data-n="seed"><small>03 · SEED</small><b>随机噪声</b><span>种子 <em id="seedV">1145141919</em></span><button class="btn xs" id="seedRoll">🎲 换种子</button></div>
+    <div class="pl" data-l="3"></div>
+    <div class="pn unet" data-n="unet"><small>04 · U-NET × <em id="pipeN">20</em></small><b>循环去噪</b><canvas id="pipeLat"></canvas><span id="pipeStep">sampler · Euler a</span></div>
+    <div class="pl" data-l="4"></div>
+    <div class="pn" data-n="vae"><small>05 · VAE</small><b>解码器</b><span>潜空间 → 像素</span></div>
+    <div class="pl" data-l="5"></div>
+    <div class="pn out" data-n="out"><small>06 · OUTPUT</small><div class="pipe-out"><canvas id="pipeOut"></canvas></div></div>
+  </div>
+  <div class="pipe-foot">
+    <button class="btn y big" id="pipeRun">▶ GENERATE</button>
+    <div class="recap rv" style="--d:.3s">
+      <span><b>01</b>学会去噪</span><span><b>02</b>潜空间里做</span><span><b>03</b>文字靠交叉注意力引导</span><span><b>04</b>CFG 放大引导</span>
+    </div>
+  </div>
+</section>
+
+<!-- 10 CH3 COVER -->
+<section class="scene cover pink" id="s-c3" data-ch="3" data-title="CH.03 · LoRA" data-next="怎么教？">
+  <div class="cv-no">03</div>
+  <div class="cv-body">
+    <div class="cv-code rv">OPERATION · LOW-RANK ADAPTATION</div>
+    <h2 class="rv" style="--d:.1s">LoRA：<br>给模型打个“补丁”</h2>
+    <p class="cv-en rv" style="--d:.2s">TEACH AN OLD MODEL A NEW FACE</p>
+    <div class="vn rv" style="--d:.4s"><i class="vn-ava"></i><div><b>遥</b><p data-type>SD 看过几十亿张图……可它从来没见过我。我是被“原创”出来的角色——那它是怎么记住我的长相的？</p></div></div>
+  </div>
+  <div class="cv-ring"></div>
+</section>
+
+<!-- 11 WHY LORA -->
+<section class="scene lab" id="s-why" data-ch="3" data-title="FULL vs LoRA · 为什么是 LoRA" data-next="数学直觉">
+  <div class="lab-text">
+    <div class="step-tag rv">LoRA · 01</div>
+    <h3 class="rv" style="--d:.05s">重装整栋楼，<br>还是贴一张贴纸？</h3>
+    <p class="rv" style="--d:.1s">想让模型学会新角色，最直接的办法是<b>全量微调</b>：把它所有参数都重新训练一遍。代价是——</p>
+    <div class="cmp rv" style="--d:.2s" id="cmpTable">
+      <div class="cmp-h"><span></span><b>全量微调</b><b class="p">LoRA</b></div>
+      <div><span>训练的参数</span><b>~8.6 亿 (100%)</b><b class="p">~百万级 (&lt;2%)</b></div>
+      <div><span>显存需求</span><b>24GB+</b><b class="p">6~12GB</b></div>
+      <div><span>产出文件</span><b>2~7 GB</b><b class="p">10~200 MB</b></div>
+      <div><span>使用方式</span><b>换一整个模型</b><b class="p">即插即用 · 可叠加</b></div>
+    </div>
+  </div>
+  <div class="lab-stage why">
+    <div class="tabs" id="whyTabs"><button class="on" data-m="full">全量微调</button><button data-m="lora">LoRA</button></div>
+    <div class="wgrid-wrap">
+      <div class="wgrid" id="wgrid"></div>
+      <div class="wlora" id="wlora"></div>
+    </div>
+    <p class="why-cap" id="whyCap">每一个方块 = 一组参数。全量微调：<b>全部</b>都要改。</p>
+  </div>
+</section>
+
+<!-- 12 MATH -->
+<section class="scene lab" id="s-math" data-ch="3" data-title="LOW-RANK · 低秩分解" data-next="插在哪里？">
+  <div class="lab-text">
+    <div class="step-tag rv">LoRA · 02</div>
+    <h3 class="rv" style="--d:.05s">只学“变化量”，<br>而且是瘦的</h3>
+    <p class="rv" style="--d:.1s">原来的权重矩阵 <b>W₀ 冻结不动</b>。我们只学一个“改变量” ΔW，并把它拆成两个瘦长的小矩阵相乘：</p>
+    <div class="formula big rv" style="--d:.2s">W = W₀ + ΔW = W₀ + <span class="p">B</span> · <span class="p">A</span></div>
+    <div class="card rv" style="--d:.3s">
+      <small>为什么“低秩”就够了？</small>
+      <p>学一个新角色，需要改变的其实只有少数几个“方向”：发色、瞳色、发饰、服装……就像调色只需要几个滑块，不必重画每一个像素。</p>
+    </div>
+    <div class="pcount rv" style="--d:.4s">
+      <div><small>W₀ 参数 (768×768)</small><b>589,824</b></div>
+      <div><small>B+A 参数 (rank <em id="rkV">8</em>)</small><b class="p" id="rkP">12,288</b></div>
+      <div><small>占比</small><b class="y" id="rkR">2.08%</b></div>
+    </div>
+  </div>
+  <div class="lab-stage math">
+    <div class="mats" id="mats">
+      <div class="mat"><canvas id="mW"></canvas><span>W₀ <i>🔒 冻结</i></span></div>
+      <div class="op">+</div>
+      <div class="mat"><canvas id="mB"></canvas><span class="p">B <i>d×r</i></span></div>
+      <div class="op">×</div>
+      <div class="mat"><canvas id="mA"></canvas><span class="p">A <i>r×d</i></span></div>
+      <div class="op">=</div>
+      <div class="mat"><canvas id="mD"></canvas><span class="p">ΔW <i>d×d</i></span></div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-row"><label>秩 rank r</label><input type="range" id="rk" min="1" max="64" value="8"><b id="rkB">8</b></div>
+      <button class="btn y" id="mTrain">▶ 训练（B 从 0 开始学）</button>
+    </div>
+  </div>
+</section>
+
+<!-- 13 WHERE -->
+<section class="scene lab" id="s-where" data-ch="3" data-title="WHERE · 注入位置" data-next="调节强度">
+  <div class="lab-text">
+    <div class="step-tag rv">LoRA · 03</div>
+    <h3 class="rv" style="--d:.05s" id="zTitle">它插在哪里？</h3>
+    <p class="rv" style="--d:.1s" id="zText">LoRA 不是一个独立的模型，它要“寄生”在 SD 里面。点击 <b>ZOOM IN</b>，一层层放大看。</p>
+    <div class="zcrumb rv" style="--d:.2s" id="zCrumb"><span class="on">SD</span><span>U-Net</span><span>Transformer</span><span>Linear W</span></div>
+  </div>
+  <div class="lab-stage where">
+    <div class="zoom" id="zoom">
+      <!-- L0 -->
+      <div class="zl" data-l="0">
+        <div class="zl0">
+          <div class="zb">CLIP</div><i></i><div class="zb hot" data-target>U-Net</div><i></i><div class="zb">VAE</div>
+        </div>
+      </div>
+      <!-- L1 -->
+      <div class="zl" data-l="1">
+        <svg viewBox="0 0 520 300" class="unet-svg">
+          <g class="ublk"><rect x="20" y="20" width="70" height="40"/><rect x="70" y="80" width="70" height="40"/><rect x="120" y="140" width="70" height="40"/><rect x="225" y="210" width="70" height="40" class="hot"/><rect x="330" y="140" width="70" height="40"/><rect x="380" y="80" width="70" height="40"/><rect x="430" y="20" width="70" height="40"/></g>
+          <path class="uflow" d="M55 60 105 80M105 120 155 140M155 180 225 225M295 225 365 180M365 140 415 120M415 80 465 60"/>
+          <path class="uskip" d="M90 40H430M140 100H380M190 160H330"/>
+          <text x="20" y="290">DOWN ↓ 压缩</text><text x="390" y="290">UP ↑ 还原</text>
+        </svg>
+        <p class="zl-note">每个块里都有<b>注意力层</b>——文字就是在这里进入画面</p>
+      </div>
+      <!-- L2 -->
+      <div class="zl" data-l="2">
+        <div class="tblock">
+          <div class="tb">Self-Attention<small>画面自己看自己</small></div>
+          <div class="tb hot">Cross-Attention<small>画面 ↔ 文字</small>
+            <div class="qkv"><span>W<sub>Q</sub></span><span>W<sub>K</sub></span><span>W<sub>V</sub></span><span>W<sub>out</sub></span></div>
+          </div>
+          <div class="tb">Feed-Forward<small>逐点加工</small></div>
+        </div>
+      </div>
+      <!-- L3 -->
+      <div class="zl" data-l="3">
+        <svg viewBox="0 0 560 300" class="bypass" id="bypass">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10Z" fill="currentColor"/></marker></defs>
+          <text x="20" y="128" class="bp-t">x</text>
+          <path class="bp-main" d="M45 120H200M320 120H440"/>
+          <rect x="200" y="85" width="120" height="70" class="bp-w"/><text x="260" y="118" class="bp-wt">W₀</text><text x="260" y="140" class="bp-ws">🔒 冻结</text>
+          <path class="bp-side" d="M90 120V230H170M250 230H300M380 230H460V150"/>
+          <polygon points="170,200 250,215 250,245 170,260" class="bp-a"/><text x="198" y="236" class="bp-lt">A</text>
+          <polygon points="300,215 380,200 380,260 300,245" class="bp-b"/><text x="335" y="236" class="bp-lt">B</text>
+          <text x="275" y="285" class="bp-r">r ≪ d</text>
+          <circle cx="460" cy="120" r="20" class="bp-plus"/><text x="460" y="127" class="bp-pt">+</text>
+          <path class="bp-main" d="M480 120H540"/><text x="530" y="105" class="bp-t">h</text>
+          <g id="bpDots"></g>
+        </svg>
+        <div class="bp-ctrl"><label class="switch"><input type="checkbox" id="bpOn" checked><i></i></label><span>LoRA <b id="bpState">ON</b></span><code>h = W₀x + <span class="p">(α/r)·BAx</span></code></div>
+      </div>
+    </div>
+    <div class="ctrl inline">
+      <button class="btn ghost" id="zOut">− ZOOM OUT</button>
+      <button class="btn y" id="zIn">ZOOM IN +</button>
+    </div>
+  </div>
+</section>
+
+<!-- 14 WEIGHT -->
+<section class="scene lab" id="s-weight" data-ch="3" data-title="WEIGHT · 强度与叠加" data-next="怎么练出来？">
+  <div class="lab-text">
+    <div class="step-tag rv">LoRA · 04</div>
+    <h3 class="rv" style="--d:.05s">一个旋钮，<br>控制“像不像”</h3>
+    <p class="rv" style="--d:.1s">使用时，LoRA 的改变量前面乘一个<b>权重</b>：</p>
+    <div class="formula rv" style="--d:.15s">W = W₀ + <b class="p" id="lwF">0.8</b> · ΔW<sub>遥</sub></div>
+    <div class="lw-meters rv" style="--d:.25s">
+      <div><small>角色还原度</small><i><em id="lwM1"></em></i></div>
+      <div><small>画面自由度</small><i><em id="lwM2"></em></i></div>
+      <div><small>崩坏风险</small><i><em id="lwM3" class="r"></em></i></div>
+    </div>
+    <div class="card dim rv" style="--d:.35s">
+      <small>还能叠加</small>
+      <p>角色 LoRA + 画风 LoRA + 服装 LoRA……<br><code>W₀ + w₁ΔW₁ + w₂ΔW₂ + …</code>&nbsp;像搭积木一样组合。</p>
+    </div>
+  </div>
+  <div class="lab-stage weight">
+    <div class="lw-prompt"><span class="pb-label">PROMPT</span><code>1girl, yao, cherry blossoms, &lt;lora:<span class="p">yao_v1</span>:<b id="lwP">0.8</b>&gt;</code></div>
+    <div class="frame lw-frame">
+      <img id="lwBase" src="assets/gallery/g67297280.jpg" alt="">
+      <img id="lwYao" src="assets/works/w01_1.jpg" alt="">
+      <i class="lw-noise" id="lwNoise"></i>
+      <span class="fr-label" id="lwState">权重 0.8 · 推荐区间</span>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-row"><label>LoRA 权重</label><input type="range" id="lw" min="0" max="1.6" step="0.05" value="0.8"><b id="lwV">0.80</b></div>
+      <p class="tiny">* 示意：权重 0 时展示的是底模理解的“粉发少女”（社区作品），并非同一种子的真实对比。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 15 TRAIN -->
+<section class="scene lab wide" id="s-train" data-ch="3" data-title="TRAINING · 炼丹" data-next="看看遥">
+  <div class="pipe-head">
+    <div class="step-tag rv">LoRA · 05</div>
+    <h3 class="rv" style="--d:.05s">一个角色 LoRA 是怎么“炼”出来的</h3>
+  </div>
+  <div class="train rv" style="--d:.15s">
+    <div class="tr-card"><b>01</b><h4>准备数据集</h4><p>15~50 张角色图，<em>多角度、多表情、多服装</em>。</p><div class="tr-thumbs"><img src="assets/works/w01_1.jpg" alt=""><img src="assets/works/w04_1.jpg" alt=""><img src="assets/works/w06_1.jpg" alt=""><img src="assets/works/w09_2.jpg" alt=""></div></div>
+    <div class="tr-card"><b>02</b><h4>打标签</h4><p>自动打标工具生成描述，再加一个<em>触发词</em>：</p><div class="tags"><span class="p">yao</span><span>1girl</span><span>pink hair</span><span>red bow</span><span>long hair</span><span>…</span></div></div>
+    <div class="tr-card"><b>03</b><h4>训练</h4><p>冻结 SD，只训练 B、A。常见：rank 16~32、约 10 轮。</p><canvas id="lossCv"></canvas></div>
+    <div class="tr-card"><b>04</b><h4>导出 · 使用</h4><div class="file"><i>.safetensors</i><b>yao_v1</b><small>≈ 37 MB</small></div><p>放进 <code>models/Lora</code>，提示词里写 <code>&lt;lora:yao_v1:0.8&gt;</code></p></div>
+  </div>
+  <div class="card warn rv" style="--d:.3s"><small>小陷阱</small><p>LoRA 会记住数据集里<b>所有反复出现的东西</b>。如果每张图都是同一个背景，背景也会被“焊死”在角色上——所以训练集要尽量多样。</p></div>
+</section>
+
+<!-- 16 CH4 COVER : OPERATOR FILE -->
+<section class="scene" id="s-c4" data-ch="4" data-title="CH.04 · 角色档案" data-next="打开档案馆">
+  <div class="op-bg"></div>
+  <div class="op-no">04</div>
+  <div class="op-art rv" style="--d:.1s"><img src="assets/works/w06_1.jpg" alt=""><i class="op-glow"></i></div>
+  <div class="op-name rv" style="--d:.2s"><small>OPERATOR FILE · No.YAO-01</small><b>遥</b><span>YAO</span></div>
+  <div class="op-info rv" style="--d:.35s">
+    <div class="op-row"><small>标志</small><b>红色蝴蝶结 · 樱粉长发</b></div>
+    <div class="op-row"><small>主色</small><b><i style="background:#ff8fb1"></i><i style="background:#c4123a"></i><i style="background:#1f2d6b"></i>樱粉 / 绯红 / 藏青</b></div>
+    <div class="op-row"><small>档案</small><b>10 套主题 · 21 张立绘</b></div>
+    <div class="op-row"><small>工具</small><b>Stable Diffusion · 本地部署</b></div>
+    <div class="op-row"><small>出处</small><b>新媒体与数字文化 · 课程作品</b></div>
+  </div>
+  <svg class="op-radar rv" style="--d:.45s" viewBox="0 0 220 220" id="radar"></svg>
+  <div class="vn vn-op rv" style="--d:.6s"><i class="vn-ava"></i><div><b>遥</b><p data-type>终于轮到我登场了！一年四季、狐火、霓虹、星海……我的十套衣服，你想先看哪一套？</p></div></div>
+</section>
+
+<!-- 17 ARCHIVE -->
+<section class="scene" id="s-arc" data-ch="4" data-title="ARCHIVE · 主题展厅" data-next="全部档案">
+  <div class="arc" id="arc">
+    <div class="arc-bg"><img id="arcBgImg" alt=""></div>
+    <canvas class="arc-fx" id="arcFx"></canvas>
+    <div class="arc-bignum" id="arcNum">01</div>
+    <div class="arc-art" id="arcArt"><div class="arc-art-in"><img id="arcImgA" alt=""><img id="arcImgB" alt=""></div><i class="arc-frame"></i></div>
+    <div class="arc-info" id="arcInfo">
+      <div class="ai-season" id="arcSeason">SPRING</div>
+      <h2 id="arcCn">繁樱戏春</h2>
+      <div class="ai-en" id="arcEn">SAKURA FROLIC</div>
+      <div class="ai-tags" id="arcTags"></div>
+      <p class="ai-note" id="arcNote"></p>
+      <div class="ai-thumbs" id="arcThumbs"></div>
+    </div>
+    <div class="arc-dialog" id="arcDialog"><b>遥</b><p id="arcLine"></p></div>
+    <nav class="arc-list" id="arcList"></nav>
+    <div class="arc-prog"><small>ARCHIVE UNLOCKED</small><b id="arcUnl">0</b>/10<i><em id="arcBar"></em></i></div>
+    <div class="arc-hint">↑ ↓ / 滚轮 切换主题 · 点击立绘放大</div>
+  </div>
+</section>
+
+<!-- 18 RING -->
+<section class="scene" id="s-ring" data-ch="4" data-title="ALL ARCHIVES · 全档案" data-next="但是……">
+  <div class="ring-stage" id="ringStage"><div class="ring" id="ring"></div></div>
+  <div class="ring-text">
+    <div class="rt-line rv"><b>21</b><span>张立绘</span></div>
+    <div class="rt-line rv" style="--d:.15s"><b>1</b><span>个角色</span></div>
+    <div class="rt-line rv" style="--d:.3s"><b class="y">0</b><span>支画笔</span></div>
+  </div>
+  <div class="ring-q rv" style="--d:.8s">……那么，<em>这些画算是“我的”作品吗？</em></div>
+  <div class="ring-hint">拖拽旋转 · 点击查看</div>
+</section>
+
+<!-- 19 CH5 COVER -->
+<section class="scene cover red" id="s-c5" data-ch="5" data-title="CH.05 · 思考" data-next="两面">
+  <div class="cv-no">05</div>
+  <div class="cv-body">
+    <div class="cv-code rv">OPERATION · AFTERMATH</div>
+    <h2 class="rv" style="--d:.1s">门槛消失之后</h2>
+    <p class="cv-en rv" style="--d:.2s">WHEN EVERYONE CAN “DRAW”</p>
+    <div class="vn rv" style="--d:.4s"><i class="vn-ava"></i><div><b>遥</b><p data-type>我很开心能被“画”出来。可是——教会 AI 画画的那些图，又是谁画的呢？</p></div></div>
+  </div>
+  <div class="cv-ring"></div>
+</section>
+
+<!-- 20 SIDES -->
+<section class="scene" id="s-sides" data-ch="5" data-title="TWO SIDES · 硬币两面" data-next="大家怎么说">
+  <div class="sides" id="sides">
+    <div class="sd sd-l">
+      <div class="sd-in">
+        <small>THE GIFT</small>
+        <h3>人人都是创作者</h3>
+        <ul>
+          <li><b>01</b>不会画画，也能把脑海里的角色变成画面——<em>遥就是这样诞生的</em></li>
+          <li><b>02</b>本地部署：开源、免费、数据留在自己电脑里</li>
+          <li><b>03</b>同人二创的门槛被大幅降低，更多人加入表达</li>
+        </ul>
+      </div>
+    </div>
+    <div class="sd sd-r" id="sdR">
+      <div class="sd-in">
+        <small>THE COST</small>
+        <h3>谁被“炼”了？</h3>
+        <ul>
+          <li><b>01</b>训练数据大量来自<em>未经授权</em>的画师作品</li>
+          <li><b>02</b>几十张图就能练出一个“画风 LoRA”，复刻一位画师</li>
+          <li><b>03</b>AI 图批量冒充手绘，挤压约稿与同人展生态</li>
+          <li><b>04</b>二创本就是灰色地带，AI 把争议放大了百倍</li>
+        </ul>
+      </div>
+    </div>
+    <div class="sd-handle" id="sdHandle"><i>⟷</i></div>
+  </div>
+</section>
+
+<!-- 21 VOICES -->
+<section class="scene" id="s-voices" data-ch="5" data-title="VOICES · 讨论区" data-next="法律怎么说">
+  <div class="vo-head">
+    <h3 class="rv">评论区吵翻了</h3>
+    <p class="rv" style="--d:.1s">在小红书刷到的几类典型声音 · <small>观点归纳转述，非原帖原文 · 点击卡片翻面</small></p>
+  </div>
+  <div class="voices" id="voices">
+    <div class="vc rv" style="--d:.15s"><div class="vc-in">
+      <div class="vc-f" style="--c:#ff5d73"><span class="who">画师</span><p>“我的图被拿去练 LoRA，有人用它批量出图卖钱，署名还不是我。”</p></div>
+      <div class="vc-b"><small>THINK</small><p>训练是否需要授权，法律仍在探索；但<b>仿特定画师画风去商用</b>，在社区里普遍被视为越界。</p></div>
+    </div></div>
+    <div class="vc rv" style="--d:.25s"><div class="vc-in">
+      <div class="vc-f" style="--c:#ffd400"><span class="who">AI 使用者</span><p>“我不会画画，AI 让我第一次把自己的 OC 画了出来，这有什么错？”</p></div>
+      <div class="vc-b"><small>THINK</small><p>AI 确实打开了表达的门。问题不在“用不用”，而在<b>怎么用、用了谁的东西、有没有诚实标注</b>。</p></div>
+    </div></div>
+    <div class="vc rv" style="--d:.35s"><div class="vc-in">
+      <div class="vc-f" style="--c:#4fd6ff"><span class="who">同人创作者</span><p>“AI 图混进同人本、谎称手绘，认真画画的人反而卖不动了。”</p></div>
+      <div class="vc-b"><small>THINK</small><p>Pixiv 等平台已要求 AI 作品单独标注，不少同人展也限制或禁止 AI 作品。<b>诚实标注</b>是对观众与同行的基本尊重。</p></div>
+    </div></div>
+    <div class="vc rv" style="--d:.45s"><div class="vc-in">
+      <div class="vc-f" style="--c:#b48cff"><span class="who">原作粉丝</span><p>“二创本来就是官方睁一只眼闭一只眼，AI 刷屏会不会让官方收紧二创？”</p></div>
+      <div class="vc-b"><small>THINK</small><p>同人生态依赖<b>默契与信任</b>。AI 低成本、大批量的产出，可能打破这份默契，最终伤害所有二创者。</p></div>
+    </div></div>
+  </div>
+</section>
+
+<!-- 22 LAW -->
+<section class="scene" id="s-law" data-ch="5" data-title="CASES · 判例时间线" data-next="如果是你">
+  <div class="vo-head">
+    <h3 class="rv">法律正在给出答案</h3>
+    <p class="rv" style="--d:.1s">点击节点展开 · 两个方向同时在被认真对待</p>
+  </div>
+  <div class="tl" id="tl">
+    <div class="tl-line"></div>
+    <div class="tn rv" style="--d:.1s"><i></i><b>2023.02</b><span>美国版权局</span><div class="tn-c"><h4>《Zarya of the Dawn》</h4><p>漫画中由 Midjourney 生成的图像<b>不受版权保护</b>；作者撰写的文字与编排可以。</p><em class="tag">AI 产出 ≠ 自动受保护</em></div></div>
+    <div class="tn rv" style="--d:.2s"><i></i><b>2023.11</b><span>北京互联网法院</span><div class="tn-c"><h4>“AI 文生图”第一案</h4><p>原告用 <b>Stable Diffusion</b> 生成图片后被他人盗用。法院认定：提示词设计、参数调整、挑选等体现了人的智力投入与个性化表达，<b>构成作品</b>；同时指出应显著标注 AI 生成。</p><em class="tag y">使用者可以是作者</em></div></div>
+    <div class="tn rv" style="--d:.3s"><i></i><b>2024.02</b><span>广州互联网法院</span><div class="tn-c"><h4>“奥特曼案”</h4><p>某 AI 绘画平台能生成与奥特曼实质性相似的图片，被判<b>侵犯复制权、改编权</b>，须停止生成并赔偿——全球首例生成式 AI 服务侵权判决。</p><em class="tag r">AI 也可能是侵权者</em></div></div>
+    <div class="tn rv" style="--d:.4s"><i></i><b>2025.09</b><span>国家网信办等四部门</span><div class="tn-c"><h4>《人工智能生成合成内容标识办法》施行</h4><p>AI 生成的图片、视频、文字等内容，须添加<b>显式标识</b>与元数据中的隐式标识。</p><em class="tag">标注成为义务</em></div></div>
+  </div>
+</section>
+
+<!-- 23 CHOICE -->
+<section class="scene" id="s-choice" data-ch="5" data-title="YOUR CHOICE · 如果是你" data-next="尾声">
+  <div class="vo-head">
+    <h3 class="rv">如果是你，会怎么做？</h3>
+    <p class="rv" style="--d:.1s">选择一个选项，看看它意味着什么</p>
+  </div>
+  <div class="choices" id="choices">
+    <div class="cq rv" style="--d:.15s">
+      <div class="cq-q"><small>CASE 01</small>你很喜欢画师 A 的画风，收集了 A 的 40 张作品，练了一个画风 LoRA。接下来——</div>
+      <button data-r="y">自己练习玩玩，不公开<span>私下学习争议最小，但模型和出图都不应传播。</span></button>
+      <button data-r="r">上传到模型社区，标题写“A 风格”<span>未经授权传播“画风复刻器”，直接冲击画师的生计。</span></button>
+      <button data-r="r">用它接约稿赚钱<span>以他人画风牟利，是最被诟病的用法。</span></button>
+    </div>
+    <div class="cq rv" style="--d:.25s">
+      <div class="cq-q"><small>CASE 02</small>你用 AI 画了自己原创角色的同人图，想发到社交平台、带去同人展——</div>
+      <button data-r="g">显著标注“AI 生成”并说明工具<span>符合《标识办法》，也是对观众的诚实。</span></button>
+      <button data-r="r">不标注，说是自己手绘的<span>欺骗观众，也对认真画画的人不公平。</span></button>
+      <button data-r="g">先看展会规则，按要求分区或不参展<span>尊重社区规则，才能长久地一起玩下去。</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- 24 END -->
+<section class="scene" id="s-end" data-ch="5" data-title="EPILOGUE · 尾声" data-next="回到开头">
+  <div class="end-collage" id="endCollage"></div>
+  <div class="end-body">
+    <div class="end-rules rv">
+      <small>MY CREED · 我的 AI 创作守则</small>
+      <ol>
+        <li><b>01</b>训练数据只用<em>自己的</em>或<em>获得授权</em>的作品</li>
+        <li><b>02</b>发布时<em>显著标注</em> AI 生成</li>
+        <li><b>03</b>不复刻在世画师的画风去商用</li>
+        <li><b>04</b>尊重原作与同人社区的规则</li>
+      </ol>
+    </div>
+    <h2 class="end-title rv" style="--d:.3s"><span>工具在变</span><span class="y">热爱不变</span></h2>
+    <div class="end-thanks rv" style="--d:.5s"><b>THANKS FOR WATCHING</b><span>Q &amp; A</span></div>
+    <p class="end-credit rv" style="--d:.7s">开场画廊作品来自 Civitai 社区（Illustrious / NoobAI 最高赞），版权归原作者，仅作课堂展示 · 角色“遥”及第四章作品为本人创作</p>
+  </div>
+</section>
+
+</main>
+
+<script src="js/embed.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/ch1.js"></script>
+<script src="js/ch2.js"></script>
+<script src="js/ch3.js"></script>
+<script src="js/ch4.js"></script>
+<script src="js/ch5.js"></script>
+</body>
+</html>
